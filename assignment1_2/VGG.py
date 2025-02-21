@@ -7,6 +7,9 @@ from PIL import Image
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from contextlib import nullcontext
+
+
 
 class VGG(nn.Module):
     """
@@ -17,20 +20,6 @@ class VGG(nn.Module):
     def __init__(self, input_channels, num_classes):
         """
         Initialize the network architecture.
-        
-        Parameters:
-        - input_channels (int): Number of input channels (e.g., 3 for RGB images, 1 for grayscale)
-        - num_classes (int): Number of output classes for classification
-        
-        TODO:
-        1. Call the parent class constructor using super().__init__()
-        2. Define the network layers as class attributes:
-           - Convolutional layers (nn.Conv2d)
-           - Pooling layers (nn.MaxPool2d)
-           - Batch normalization layers (nn.BatchNorm2d)
-           - Fully connected layers (nn.Linear)
-        3. Define activation functions (e.g., ReLU)
-        4. Consider adding dropout layers (nn.Dropout) for regularization
         """
         super().__init__()
 
@@ -56,8 +45,11 @@ class VGG(nn.Module):
         self.relu6 = nn.ReLU()
         self.maxpool6 = nn.MaxPool2d(kernel_size = 2, stride = 2)
 
+        # Calculate the size of flattened features
+        # After 5 max pooling layers: 32/(2^5) = 1
+        # So feature map size is 1x1x512
         self.flatten = nn.Flatten()
-        self.fc1 = nn.Linear(512 * 7 * 7, 4096)
+        self.fc1 = nn.Linear(512, 4096)  # Changed from 512*7*7
         self.relu7 = nn.ReLU()
         self.dropout1 = nn.Dropout(p = 0.5)
 
@@ -69,22 +61,7 @@ class VGG(nn.Module):
 
     def forward(self, x):
         """
-        Define the forward pass of the network.
-        
-        Parameters:
-        - x (torch.Tensor): Input tensor of shape (batch_size, channels, height, width)
-        
-        Returns:
-        - torch.Tensor: Output tensor of shape (batch_size, num_classes)
-        
-        TODO:
-        1. Implement the forward pass using the layers defined in __init__
-        2. Process the input through convolutional layers
-        3. Apply activation functions after each conv layer
-        4. Apply pooling layers as needed
-        5. Flatten the tensor before fully connected layers
-        6. Pass through fully connected layers
-        7. Return the final output
+        Define the forward pass of the network. 
         """
         x = self.conv1(x)
         x = self.relu1(x)
@@ -174,7 +151,7 @@ class ImageDataset(Dataset):
 
         return image, label
 
-    def show_sample(self, idx):
+    def save_sample(self, idx):
         """
         Display an image from the dataset
         Args:
@@ -189,10 +166,148 @@ class ImageDataset(Dataset):
         plt.imshow(image_np)
         plt.title(f'Class: {self.class_map[label]}')
         plt.axis('off')
-        plt.savefig(f'sample_{idx}.png')
-    
+        # plt.savefig(f'sample_{idx}.png')
+        plt.imsave(f'sample_{idx}.png', image_np)
+
+
+# Implement the datasets for train and test
+
+class ModelManager:
+    def __init__(self):
+        print("Initializing Model")
+        self.model = VGG(input_channels=3, num_classes=10)
+        print("Initializing Train Dataset")
+        self.train_dataset = ImageDataset('./competition_data/train.csv')
+        self.batch_size = 32
+        self.lr = 0.001
+        self.epochs = 10
+        self.loss_fn = nn.CrossEntropyLoss()
+        
+        # Device selection logic
+        if torch.cuda.is_available():
+            self.device = torch.device('cuda')
+            print("Using CUDA GPU")
+        elif torch.backends.mps.is_available():
+            self.device = torch.device('mps')
+            print("Using Apple Metal (MPS)")
+        else:
+            self.device = torch.device('cpu')
+            print("Using CPU")
+            
+        # Move model to the selected device
+        self.model = self.model.to(self.device)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
+        
+        self.train_dataloader = torch.utils.data.DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            shuffle=True
+        )
+        self.val_dataset = ImageDataset('./competition_data/val.csv')
+        self.val_dataloader = torch.utils.data.DataLoader(
+            self.val_dataset,
+            batch_size=self.batch_size,
+            shuffle=True
+        )
+        os.makedirs('./models', exist_ok=True)
+        self.model_save_path = './models'
+
+    def train_model(self):
+        train_lossses = []
+        train_accuracies = []
+        val_losses = []
+        val_accuracies = []
+
+        train_total_steps = len(self.train_dataloader)
+        val_total_steps = len(self.val_dataloader)
+
+        for epoch in range(self.epochs):
+            self.model.train(True)
+
+            train_loss, train_acc = self.train_validate(epoch, self.epochs, train_total_steps)
+            val_loss, val_acc = self.train_validate(epoch, self.epochs, val_total_steps, validation=True)
+            print("--------------------------------")
+            print(f"End of Epoch {epoch + 1} / {self.epochs}")
+            print (f"Epoch {epoch + 1} / {self.epochs} --> Val Loss: {val_loss} Val Acc: {val_acc}")
+            print("--------------------------------")
+            self.save_best_model(val_loss, val_losses, epoch)
+            train_lossses.append(train_loss)
+            train_accuracies.append(train_acc)
+            val_losses.append(val_loss)
+            val_accuracies.append(val_acc)
+
+
+        return train_lossses, train_accuracies, val_losses, val_accuracies
+
+    def train_validate(self, epoch: int, total_epochs: int, total_steps: int, validation : bool = False):
+        
+        running_acc = 0.0
+        running_loss = 0.0
+        
+        # Set model to eval mode during validation
+        self.model.train(not validation)
+        
+        context = torch.no_grad() if validation else nullcontext()
+        with context:
+            for i, (images, labels) in enumerate(self.val_dataloader if validation else self.train_dataloader):
+                images = images.to(self.device)
+                labels = labels.to(self.device)
+
+                # Only zero gradients and do backward pass during training
+                if not validation:
+                    self.optimizer.zero_grad()
+                
+                outputs = self.model(images)
+                loss = self.loss_fn(outputs, labels)
+                accuracy = self.compute_accuracy(outputs, labels)
+
+                # Only do backward pass and optimization during training
+                if not validation:
+                    loss.backward()
+                    self.optimizer.step()
+
+                running_loss += loss.item()
+                running_acc += accuracy
+
+                if (i + 1) % 100 == 0:
+                    print(
+                        f"{'Validation' if validation else 'Training'} --> " +
+                        f"Epoch {epoch + 1} / {total_epochs} " +
+                        f"Step {i + 1} / {total_steps} " +
+                        f"Loss: {running_loss / (i+1):.4f} " +
+                        f"Accuracy: {running_acc / (i+1):.4f}"
+                    )
+            
+            running_loss = running_loss / total_steps
+            running_acc = running_acc / total_steps
+            return running_loss, running_acc
+
+
+    def save_best_model(self, val_loss, val_losses, epoch):
+        
+
+        if len(val_losses) == 0:
+            torch.save(self.model.state_dict(), os.path.join(self.model_save_path, f'epoch_{epoch}.pt'))
+        else:
+            if val_loss < min(val_losses):
+                torch.save(self.model.state_dict(), os.path.join(self.model_save_path, f'epoch_{epoch}.pt'))
+
+    def compute_accuracy(self, outputs, labels):
+        predictions = torch.argmax(outputs, dim=1)
+
+        num_predictions = len(predictions)
+        num_incorrect = torch.count_nonzero(predictions - labels)
+
+        accuracy = (num_predictions - num_incorrect) / num_predictions
+        return accuracy
+
+
 
 
 if __name__ == "__main__":
-    vgg = VGG(input_channels=3, num_classes=10)
-    summary(vgg, (3, 224, 224))
+    manager = ModelManager()
+    train_lossses, train_accuracies, val_losses, val_accuracies = manager.train_model()
+    # vgg = VGG(input_channels=3, num_classes=10)
+    # dataset = ImageDataset('./competition_data/train.csv')
+    # dataset.save_sample(0)
+    # summary(vgg, (3, 224, 224))
