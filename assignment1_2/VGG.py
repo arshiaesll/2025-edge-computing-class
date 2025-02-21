@@ -180,7 +180,7 @@ class ModelManager:
         self.train_dataset = ImageDataset('./competition_data/train.csv')
         self.batch_size = 32
         self.lr = 0.001
-        self.epochs = 10
+        self.epochs = 50
         self.loss_fn = nn.CrossEntropyLoss()
         
         # Device selection logic
