@@ -1,0 +1,16 @@
+Model_MiniVGG_2_1d7c.pt,0.6060
+Model_MiniVGG_3_6b30.pt,0.6518
+Model_MiniVGG_4_d255.pt,0.6630
+Model_MiniVGG_5_f479.pt,0.7066
+Model_MiniVGG_6_07ec.pt,0.7184
+Model_MiniVGG_7_e869.pt,0.7396
+Model_MiniVGG_8_0ebb.pt,0.7448
+Model_MiniVGG_9_ad13.pt,0.7582
+Model_MiniVGG_10_5ab7.pt,0.7670
+Model_MiniVGG_11_3601.pt,0.7676
+Model_MiniVGG_13_89fe.pt,0.7807
+Model_MiniVGG_14_8f41.pt,0.7824
+Model_MiniVGG_15_1bb8.pt,0.7881
+Model_MiniVGG_17_110b.pt,0.7909
+Model_MiniVGG_18_8015.pt,0.7939
+Model_MiniVGG_19_2fd0.pt,0.7944

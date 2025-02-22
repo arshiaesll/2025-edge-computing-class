@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from contextlib import nullcontext
-
+import uuid
 
 
 class VGG(nn.Module):
@@ -105,7 +105,7 @@ class ImageDataset(Dataset):
     Custom Dataset for loading image data from CSV file.
     The CSV file should contain image pixel values and labels.
     """
-    def __init__(self, csv_file, transform=None):
+    def __init__(self, csv_file, transform=None, test = False):
         """
         Args:
             csv_file (str): Path to the csv file with image data
@@ -116,8 +116,11 @@ class ImageDataset(Dataset):
         self.transform = transform
         
         # Separate features (images) and labels
-        self.images = self.data.iloc[:, 2:].values  # Skip id and label columns
-        self.labels = self.data.iloc[:, 1].values   # Labels are in second column
+        if not test:
+            self.images = self.data.iloc[:, 2:].values  # Skip id and label columns
+            self.labels = self.data.iloc[:, 1].values   # Labels are in second column
+        else:
+            self.images = self.data.iloc[:, 1:].values  # Skip id column
         
         # Dictionary for class names
         self.class_map = {
@@ -230,7 +233,7 @@ class ModelManager:
             print(f"End of Epoch {epoch + 1} / {self.epochs}")
             print (f"Epoch {epoch + 1} / {self.epochs} --> Val Loss: {val_loss} Val Acc: {val_acc}")
             print("--------------------------------")
-            self.save_best_model(val_loss, val_losses, epoch)
+            self.save_best_model(val_acc, val_accuracies, epoch)
             train_lossses.append(train_loss)
             train_accuracies.append(train_acc)
             val_losses.append(val_loss)
@@ -283,14 +286,17 @@ class ModelManager:
             return running_loss, running_acc
 
 
-    def save_best_model(self, val_loss, val_losses, epoch):
+    def save_best_model(self, val_acc, val_accuracies, epoch):
         
+        model_name = f'Model_{epoch + 1}_{str(uuid.uuid4())[:4]}.pt'
+        if len(val_accuracies) == 0:
+            pass
+        elif val_acc > max(val_accuracies):
+            torch.save(self.model.state_dict(), os.path.join(self.model_save_path, model_name)) 
+            with open('summary.txt', 'a') as f:
+                f.write(f'{model_name},{val_acc:.4f}\n')
 
-        if len(val_losses) == 0:
-            torch.save(self.model.state_dict(), os.path.join(self.model_save_path, f'epoch_{epoch}.pt'))
-        else:
-            if val_loss < min(val_losses):
-                torch.save(self.model.state_dict(), os.path.join(self.model_save_path, f'epoch_{epoch}.pt'))
+
 
     def compute_accuracy(self, outputs, labels):
         predictions = torch.argmax(outputs, dim=1)
