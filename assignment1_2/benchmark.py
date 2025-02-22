@@ -4,6 +4,22 @@ import pandas as pd
 from MiniVGG import ImageDataset, VGG
 import os
 import torch.quantization
+import torch.nn.utils.prune as prune
+
+def apply_pruning(model, amount=0.3):
+    """Apply PyTorch's built-in pruning"""
+    for name, module in model.named_modules():
+        # Prune 30% of connections in all Conv2d layers
+        if isinstance(module, torch.nn.Conv2d):
+            prune.l1_unstructured(module, name='weight', amount=amount)
+            # Make pruning permanent
+            prune.remove(module, 'weight')
+        # Prune 30% of connections in Linear layers
+        elif isinstance(module, torch.nn.Linear):
+            prune.l1_unstructured(module, name='weight', amount=amount)
+            # Make pruning permanent
+            prune.remove(module, 'weight')
+    return model
 
 def load_best_model():
     # Read summary.txt to find the best model
@@ -21,6 +37,10 @@ def load_best_model():
     model = VGG(input_channels=3, num_classes=10)
     model.load_state_dict(torch.load(os.path.join('models', best_model_name), weights_only=True))
     model.eval()
+    
+    # Apply pruning
+    # model = apply_pruning(model, amount=0.3)  # Prune 30% of weights
+    print("Model pruned using PyTorch pruning!")
     
     # Convert to FP16
     model = model.half()
@@ -41,13 +61,15 @@ def load_best_model():
             model = torch.jit.optimize_for_inference(
                 torch.jit.script(model)
             )
+            torch.backends.mps.graph_executor_enabled = True
             print("Model optimized successfully!")
         except Exception as e:
             print(f"Optimization failed, using standard model: {str(e)}")
     else:
         device = torch.device('cpu')
         model = model.to(device)
-    
+    # model = torch.compile(model, mode="reduce-overhead")
+
     return model, device, expected_acc
 
 def run_benchmark():
@@ -67,14 +89,14 @@ def run_benchmark():
     print("\nWarming up...")
     dummy_input = torch.randn(1, 3, 32, 32, dtype=torch.float16).to(device)
     with torch.no_grad():
-        for _ in range(100):  # Run 100 warm-up inferences
-            _ = model(dummy_input)
+            for _ in range(5):  # Run 100 warm-up inferences
+                _ = model(dummy_input)
     print("Warm-up complete!")
     
     results = []
     print("\nRunning inference on test dataset...")
-    
-    with torch.no_grad():  # Disable gradient computation for inference
+    # with torch.no_grad():  # Disable gradient computation for inference
+    with torch.inference_mode(mode = True):
         for i, (image, _) in enumerate(test_dataloader):
             image = image.half().to(device)  # Convert to FP16
             

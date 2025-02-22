@@ -92,19 +92,11 @@ class VGG(nn.Module):
         #     nn.MaxPool2d(kernel_size=2, stride=2)
         # )
         self.classifier = nn.Sequential(
+            nn.AdaptiveAvgPool2d((1, 1)),  # Global Average Pooling
             nn.Flatten(),
-            nn.Linear(64 * 8 * 8, 512),
-            nn.ReLU(),
-            nn.BatchNorm1d(512),
             nn.Dropout(p=0.5),
-            nn.Linear(512, num_classes)
+            nn.Linear(64, num_classes)  # Direct mapping from channels to classes
         )
-        # self.classifier = nn.Sequential(
-        #     nn.AdaptiveAvgPool2d((1, 1)),  # Global Average Pooling
-        #     nn.Flatten(),
-        #     nn.Dropout(p=0.5),
-        #     nn.Linear(512, num_classes)  # Single linear layer for classification
-        # )
 
 
     def forward(self, x):
@@ -209,7 +201,7 @@ class ModelManager:
         self.train_dataset = ImageDataset('./competition_data/train.csv')
         self.batch_size = 32
         self.lr = 0.0001
-        self.epochs = 40
+        self.epochs = 100
         self.loss_fn = nn.CrossEntropyLoss()
         
         # Device selection logic
