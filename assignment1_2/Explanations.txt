@@ -1,0 +1,5 @@
+I started by making a VGG11 model and got accuracy of about 65%. Then I made VGG19 
+that resulted in better accuracy of about 85% but the latency was too high. So I 
+tried to make the MiniVGG that gave me the accuracy of 80% and a better latency. 
+I levereged my macbook air GPU by converting the model into the coreML model which 
+resulted in a 3x speed up.

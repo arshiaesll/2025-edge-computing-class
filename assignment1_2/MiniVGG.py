@@ -45,52 +45,6 @@ class VGG(nn.Module):
             nn.Dropout(p=0.25)
         )
 
-        # self.block3 = nn.Sequential(
-        #     nn.Conv2d(128, 256, kernel_size=3, padding=1, stride=1),
-        #     nn.BatchNorm2d(256),
-        #     nn.ReLU(),
-        #     nn.Conv2d(256, 256, kernel_size=3, padding=1, stride=1),
-        #     nn.BatchNorm2d(256),
-        #     nn.ReLU(),
-        #     nn.Conv2d(256, 256, kernel_size=3, padding=1, stride=1),
-        #     nn.BatchNorm2d(256),
-        #     nn.ReLU(),
-        #     nn.Conv2d(256, 256, kernel_size=3, padding=1, stride=1),
-        #     nn.BatchNorm2d(256),
-        #     nn.ReLU(),
-        #     nn.MaxPool2d(kernel_size=2, stride=2)
-        # )
-
-        # self.block4 = nn.Sequential(
-        #     nn.Conv2d(256, 512, kernel_size=3, padding=1, stride=1),
-        #     nn.BatchNorm2d(512),
-        #     nn.ReLU(),
-        #     nn.Conv2d(512, 512, kernel_size=3, padding=1, stride=1),
-        #     nn.BatchNorm2d(512),
-        #     nn.ReLU(),
-        #     nn.Conv2d(512, 512, kernel_size=3, padding=1, stride=1),    
-        #     nn.BatchNorm2d(512),
-        #     nn.ReLU(),
-        #     nn.Conv2d(512, 512, kernel_size=3, padding=1, stride=1),
-        #     nn.BatchNorm2d(512),
-        #     nn.ReLU(),
-        #     nn.MaxPool2d(kernel_size=2, stride=2)
-        # )
-        # self.block5 = nn.Sequential(
-        #     nn.Conv2d(512, 512, kernel_size=3, padding=1, stride=1),
-        #     nn.BatchNorm2d(512),
-        #     nn.ReLU(),
-        #     nn.Conv2d(512, 512, kernel_size=3, padding=1, stride=1),
-        #     nn.BatchNorm2d(512),
-        #     nn.ReLU(),
-        #     nn.Conv2d(512, 512, kernel_size=3, padding=1, stride=1),    
-        #     nn.BatchNorm2d(512),
-        #     nn.ReLU(),
-        #     nn.Conv2d(512, 512, kernel_size=3, padding=1, stride=1),
-        #     nn.BatchNorm2d(512),
-        #     nn.ReLU(),
-        #     nn.MaxPool2d(kernel_size=2, stride=2)
-        # )
         self.classifier = nn.Sequential(
             nn.AdaptiveAvgPool2d((1, 1)),  # Global Average Pooling
             nn.Flatten(),
@@ -105,9 +59,6 @@ class VGG(nn.Module):
         """
         x = self.block1(x)
         x = self.block2(x)
-        # x = self.block3(x)
-        # x = self.block4(x)
-        # x = self.block5(x)
         x = self.classifier(x)
         return x
 
@@ -331,7 +282,3 @@ class ModelManager:
 if __name__ == "__main__":
     manager = ModelManager()
     train_lossses, train_accuracies, val_losses, val_accuracies = manager.train_model()
-    # vgg = VGG(input_channels=3, num_classes=10)
-    # dataset = ImageDataset('./competition_data/train.csv')
-    # dataset.save_sample(0)
-    # summary(vgg, (3, 224, 224))
